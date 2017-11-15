@@ -102,7 +102,9 @@ void loop() {
           lcd.print("Found ID #"); lcd.print(finger.fingerID);
           lcd.setCursor(0, 1);
           lcd.print("Confidence "); lcd.print(finger.confidence);
+          digitalWrite(13, HIGH);
           _delay_ms(5000);
+          digitalWrite(13, LOW);
           lcd.clear();
           lcd.setCursor(0, 0);
           lcd.print("Locked!!!");
