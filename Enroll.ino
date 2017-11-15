@@ -57,9 +57,7 @@ void setup() {
   // set compare match register for 1hz increments
   OCR1A = 7;// = (16*10^6) / (1*1024) - 1 (must be <65536)
   // turn on CTC mode
-  TCCR1B |= (1 << WGM12);
-  // Set CS10 and CS12 bits for 1024 prescaler
-  TCCR1B |= (1 << CS12) | (1 << CS10);
+  TCCR1B |= (1 << WGM12) | (1 << CS12) | (1 << CS10);
   // enable timer compare interrupt
   TIMSK1 |= (1 << OCIE1A);
   //  sei();//allow interrupts
@@ -115,11 +113,7 @@ void loop() {
     _delay_ms(50);
   }
 
-  getFingerprintIDez();
-  _delay_ms(50);
-
   while (enrolButtonState == LOW) {
-    Serial.println("Here");
     while (enterButtonState)
       continue;
     enrolButtonClicked();
