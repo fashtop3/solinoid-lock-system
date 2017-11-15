@@ -49,7 +49,7 @@ void setup() {
   PCMSK1 |= bit (PCINT13) | bit (PCINT12) | bit (PCINT11);
   PCICR |= (1 << PCIE1);
 
-//  cli();//stop interrupts
+  //  cli();//stop interrupts
   //set timer1 interrupt at 1Hz
   TCCR1A = 0;// set entire TCCR1A register to 0
   TCCR1B = 0;// same for TCCR1B
@@ -62,7 +62,7 @@ void setup() {
   TCCR1B |= (1 << CS12) | (1 << CS10);
   // enable timer compare interrupt
   TIMSK1 |= (1 << OCIE1A);
-//  sei();//allow interrupts
+  //  sei();//allow interrupts
 
   pinMode(ENTER_BUTTON, INPUT_PULLUP);
   pinMode(ID_BUTTON, INPUT_PULLUP);
@@ -91,45 +91,42 @@ void setup() {
 
 void loop() {
 
-  while (1) {
-    //  digitalWrite(ledPin, state);
-
-    while (enrolButtonState == HIGH) {
-      if (getFingerprintIDez() != -1) {
-        Serial.println("Found one");
-        if (finger.confidence >= 60 && finger.confidence <= 100) {
-          lcd.clear();
-          lcd.setCursor(0, 0);
-          lcd.print("Found ID #"); lcd.print(finger.fingerID);
-          lcd.setCursor(0, 1);
-          lcd.print("Confidence "); lcd.print(finger.confidence);
-          _delay_ms(5000);
-          lcd.clear();
-          lcd.setCursor(0, 0);
-          lcd.print("Locked!!!");
-          lcd.setCursor(0, 1);
-          lcd.print("Sensor Ready!");
-        } else {
-          lcd.clear();
-          lcd.setCursor(0, 0);
-          lcd.print("Finger not valid");
-        }
+  while (enrolButtonState == HIGH) {
+    if (getFingerprintIDez() != -1) {
+      Serial.println("Found one");
+      if (finger.confidence >= 60 && finger.confidence <= 100) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Found ID #"); lcd.print(finger.fingerID);
+        lcd.setCursor(0, 1);
+        lcd.print("Confidence "); lcd.print(finger.confidence);
+        _delay_ms(5000);
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Locked!!!");
+        lcd.setCursor(0, 1);
+        lcd.print("Sensor Ready!");
+      } else {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Finger not valid");
       }
-      _delay_ms(50);
     }
-
-    getFingerprintIDez();
     _delay_ms(50);
-
-    while (enrolButtonState == LOW) {
-      Serial.println("Here");
-      while (enterButtonState)
-        continue;
-      enrolButtonClicked();
-      enrolButtonState = HIGH;
-      break;
-    }
   }
+
+  getFingerprintIDez();
+  _delay_ms(50);
+
+  while (enrolButtonState == LOW) {
+    Serial.println("Here");
+    while (enterButtonState)
+      continue;
+    enrolButtonClicked();
+    enrolButtonState = HIGH;
+    break;
+  }
+
 }
 
 //ISR (PCINT1_vect){}
