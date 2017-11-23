@@ -18,7 +18,8 @@
 #define d6 11
 #define d7 12
 
-#define solenoidPin 13
+#define SIGNAL_PIN  13
+#define DOOR_SENSE  6
 
 int8_t k = 0;
 volatile char enrolButtonState = HIGH;
@@ -34,7 +35,6 @@ void initialize();
 void enrolButtonClicked();
 void WDT_rst(void);
 
-const byte ledPin = 13;
 volatile byte state = HIGH;
 volatile int pressedConfidenceLevel = 0;
 volatile int releasedConfidenceLevel = 0;
@@ -48,28 +48,15 @@ Adafruit_Fingerprint finger = Adafruit_Fingerprint( &lockSerial);
 
 void setup() {
 
-  PCMSK1 |= bit (PCINT13) | bit (PCINT12) | bit (PCINT11);
-  PCICR |= (1 << PCIE1);
-
-  //  cli();//stop interrupts
-  //set timer1 interrupt at 1Hz
-  TCCR1A = 0;// set entire TCCR1A register to 0
-  TCCR1B = 0;// same for TCCR1B
-  TCNT1  = 0;//initialize counter value to 0
-  // set compare match register for 1hz increments
-  OCR1A = 7;// = (16*10^6) / (1*1024) - 1 (must be <65536)
-  // turn on CTC mode
-  TCCR1B |= (1 << WGM12) | (1 << CS12) | (1 << CS10);
-  // enable timer compare interrupt
-  TIMSK1 |= (1 << OCIE1A);
-  //  sei();//allow interrupts
-
   pinMode(ENTER_BUTTON, INPUT_PULLUP);
   pinMode(ID_BUTTON, INPUT_PULLUP);
   pinMode(ENROLL_BUTTON, INPUT_PULLUP);
   pinMode(TOUCH_SENSE_BUTTON, INPUT);
 
-  pinMode(solenoidPin, OUTPUT);
+
+  pinMode(DOOR_SENSE, OUTPUT);
+  pinMode(SIGNAL_PIN, OUTPUT);
+  digitalWrite(SIGNAL_PIN, HIGH);
 
   while (!Serial);
 
@@ -81,50 +68,98 @@ void setup() {
   initialize();
   // check and verify fingerprintModule
 
-  Serial.println("Waiting for valid finger...");
-  delay(1000);
   lcd.clear();
-  lcd.print("Locked!!!");
-  lcd.setCursor(0, 1);
-  lcd.print("Sensor Ready!");
+  lcd.setCursor(0, 0);
+  lcd.print("CMD MODE...");
+  delay(3000);
+  if (digitalRead(ENROLL_BUTTON) == LOW) {
+
+    lcd.setCursor(0, 1);
+    lcd.print("Authenticate...");
+
+    while (1) {
+      if (getFingerprintIDez() != -1) {
+        if ((finger.confidence >= 60 && finger.confidence <= 100) && (finger.fingerID == 0 || finger.fingerID == 1)) {
+          PCMSK1 |= bit (PCINT13) | bit (PCINT12) | bit (PCINT11);
+          PCICR |= (1 << PCIE1);
+
+          //  cli();//stop interrupts
+          //set timer1 interrupt at 1Hz
+          TCCR1A = 0;// set entire TCCR1A register to 0
+          TCCR1B = 0;// same for TCCR1B
+          TCNT1  = 0;//initialize counter value to 0
+          // set compare match register for 1hz increments
+          OCR1A = 7;// = (16*10^6) / (1*1024) - 1 (must be <65536)
+          // turn on CTC mode
+          TCCR1B |= (1 << WGM12) | (1 << CS12) | (1 << CS10);
+          // enable timer compare interrupt
+          TIMSK1 |= (1 << OCIE1A);
+          //  sei();//allow interrupts
+          enrolButtonState = LOW;
+
+          Serial.println("Enrolling!");
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("Enrolling!!!");
+          break;
+        } else {
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("Auth Failed!!!");
+          delay(1000);
+          WDT_rst();
+          break;
+        }
+      }
+    }
+  }
+  else {
+    Serial.println("Waiting for valid finger...");
+    delay(1000);
+    lcd.clear();
+    lcd.print("Locked!!!");
+    lcd.setCursor(0, 1);
+    lcd.print("Sensor Ready!");
+  }
+
+
 }
 
 
 void loop() {
 
-  if (digitalRead(TOUCH_SENSE_BUTTON) == HIGH) {
-    while (enrolButtonState == HIGH) {
-      if (getFingerprintIDez() != -1) {
-        Serial.println("Found one");
-        if (finger.confidence >= 60 && finger.confidence <= 100) {
-          lcd.clear();
-          lcd.setCursor(0, 0);
-          lcd.print("Found ID #"); lcd.print(finger.fingerID);
-          lcd.setCursor(0, 1);
-          lcd.print("Confidence "); lcd.print(finger.confidence);
-          digitalWrite(13, HIGH);
-          _delay_ms(5000);
-          digitalWrite(13, LOW);
-          lcd.clear();
-          lcd.setCursor(0, 0);
-          lcd.print("Locked!!!");
-          lcd.setCursor(0, 1);
-          lcd.print("Sensor Ready!");
-        }
-        digitalWrite(TOUCH_SENSE_BUTTON, LOW);
-        break;
+  //  if (digitalRead(TOUCH_SENSE_BUTTON) == HIGH) {
+  //    delay(20);
+  while (enrolButtonState == HIGH) {
+    if (getFingerprintIDez() != -1) {
+      Serial.println("Found one");
+      if (finger.confidence >= 60 && finger.confidence <= 100) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Found ID #"); lcd.print(finger.fingerID);
+        lcd.setCursor(0, 1);
+        lcd.print("Confidence "); lcd.print(finger.confidence);
+        digitalWrite(DOOR_SENSE, HIGH);
+        _delay_ms(5000);
+        digitalWrite(DOOR_SENSE, LOW);
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Locked!!!");
+        lcd.setCursor(0, 1);
+        lcd.print("Sensor Ready!");
       }
-      _delay_ms(50);
+      digitalWrite(TOUCH_SENSE_BUTTON, LOW);
+      break;
     }
+    _delay_ms(50);
   }
+  //  }
 
-  while (enrolButtonState == LOW) {
+  while (enrolButtonState == LOW/*enrolButtonState == LOW*/) {
     while (enterButtonState)
       continue;
     enrolButtonClicked();
     WDT_rst();
-    //    enrolButtonState = HIGH;
-    //    break;
   }
 
 }
@@ -133,70 +168,51 @@ void loop() {
 
 
 ISR(TIMER1_COMPA_vect) { //change the 0 to 1 for timer1 and 2 for timer2
-  if (digitalRead(ENROLL_BUTTON) == LOW) {
-    pressedConfidenceLevel++;
-    if (pressedConfidenceLevel > 200) {
-      if (pressed == 0) {
-        //        state = !state;
-        enrolButtonState = !enrolButtonState;
-        pressed = 1;
-        if (!enrolButtonState) {
-          //Serial.println("Enroll!");
+
+  if (enrolButtonState == LOW) {
+    if (digitalRead(ID_BUTTON) == LOW) {
+      pressedConfidenceLevel++;
+      if (pressedConfidenceLevel > 200) {
+        if (pressed == 0) {
+          //        state = !state;
+          id = counter;
+          (counter > 13) ? counter = 0 : counter++;
+          //Serial.print("Enrolling ID #");
+          //Serial.println(id);
           lcd.clear();
           lcd.setCursor(0, 0);
-          lcd.print("Enrolling!!!");
+          lcd.print("Enroll. ID #");
+          lcd.print(id);
+          pressed = 1;
+          //        //Serial.println("Pressed!");
         }
-        else {
-          //Serial.println("Waiting...!");
-          lcd.clear();
-          lcd.setCursor(0, 0);
-          lcd.print("Waiting...");
+        pressedConfidenceLevel = 0;
+      }
+    }
+    else if (digitalRead(ENTER_BUTTON) == LOW) {
+      pressedConfidenceLevel++;
+      if (pressedConfidenceLevel > 200) {
+        if (pressed == 0) {
+          //        state = !state;
+          enterButtonState = LOW;
+          pressed = 1;
+          //Serial.println("Enter Pressed!");
         }
+        pressedConfidenceLevel = 0;
       }
-      pressedConfidenceLevel = 0;
     }
-  }
-  else if (digitalRead(ID_BUTTON) == LOW) {
-    pressedConfidenceLevel++;
-    if (pressedConfidenceLevel > 200) {
-      if (pressed == 0) {
-        //        state = !state;
-        id = counter;
-        (counter > 13) ? counter = 0 : counter++;
-        //Serial.print("Enrolling ID #");
-        //Serial.println(id);
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Enroll. ID #");
-        lcd.print(id);
-        pressed = 1;
-        //        //Serial.println("Pressed!");
+    else {
+      releasedConfidenceLevel++;
+      if (releasedConfidenceLevel > 200) {
+        pressed = 0;
+        enterButtonState = HIGH;
+        //      //Serial.println("Unpressed!");
+        releasedConfidenceLevel = 0;
+        pressedConfidenceLevel = 0;
       }
-      pressedConfidenceLevel = 0;
     }
   }
-  else if (digitalRead(ENTER_BUTTON) == LOW) {
-    pressedConfidenceLevel++;
-    if (pressedConfidenceLevel > 200) {
-      if (pressed == 0) {
-        //        state = !state;
-        enterButtonState = LOW;
-        pressed = 1;
-        //Serial.println("Enter Pressed!");
-      }
-      pressedConfidenceLevel = 0;
-    }
-  }
-  else {
-    releasedConfidenceLevel++;
-    if (releasedConfidenceLevel > 200) {
-      pressed = 0;
-      enterButtonState = HIGH;
-      //      //Serial.println("Unpressed!");
-      releasedConfidenceLevel = 0;
-      pressedConfidenceLevel = 0;
-    }
-  }
+
 }
 
 void enrolButtonClicked()
@@ -526,8 +542,11 @@ int getFingerprintIDez() {
 
 void WDT_rst(void)
 {
+  lcd.clear();
+  lcd.print("SOFT.RST");
+  Serial.println("SOFT.RST");
+  delay(2000);
   WDTCSR = 0x18;
   WDTCSR = 0x08;
-  Serial.println("SOFT.RST");
   while (1);
 }
